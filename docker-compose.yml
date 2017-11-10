@@ -1,0 +1,67 @@
+version: '3'
+
+services:
+    mongo:
+        image: mongo
+        environment:
+            - TZ=Europe/Warsaw
+        volumes:
+            - mongo:/data/db
+
+    elasticsearch:
+        image: elasticsearch:2
+        command: "elasticsearch -Des.cluster.name='graylog'"
+        volumes:
+            - elasticsearch:/usr/share/elasticsearch/data
+
+    influxdb:
+        image: influxdb
+        volumes:
+            - influxdb:/var/lib/influxdb
+            
+    telegraf:
+        image: telegraf
+        ports:
+            - "8125:8125/udp"
+        depends_on:
+            - influxdb
+        links:
+            - influxdb
+        volumes:
+            - ./services/telegraf/telegraf.conf:/etc/telegraf/telegraf.conf:ro
+
+    grafana:
+        build: ./services/grafana
+        ports:
+            - "3000:3000"
+        depends_on:
+            - influxdb
+        links:
+            - influxdb
+        environment:
+            - TZ=Europe/Warsaw
+            - GF_SERVER_ROOT_URL=http://localhost:3000
+            - GF_SECURITY_ADMIN_PASSWORD=test123
+            - GF_INSTALL_PLUGINS=grafana-clock-panel,grafana-simple-json-datasource
+
+    graylog:
+        image: graylog2/server:2.1.1-1
+        ports:
+            - "9000:9000"
+            - "12201:12201/udp"
+        depends_on:
+            - mongo
+            - elasticsearch
+        links:
+            - mongo:mongo
+            - elasticsearch:elasticsearch
+        environment:
+            GRAYLOG_PASSWORD_SECRET: 8TIYRmqsNA0D8bvA
+            #GRAYLOG_ROOT_PASSWORD_SHA2: ***
+            GRAYLOG_WEB_ENDPOINT_URI: http://localhost:9000
+
+
+volumes:
+  mongo:
+  elasticsearch:
+  influxdb:
